@@ -347,10 +347,43 @@ docker build -t tak-server-db:latest -f "$PROJECT_DIR/docker/$DOCKER_ARCH/Docker
 docker build -t tak-server:latest -f "$PROJECT_DIR/docker/$DOCKER_ARCH/Dockerfile.takserver" "$PROJECT_DIR"
 
 ### Load images into Kubernetes cluster
+TAK_IMAGE="tak-server"
+DB_IMAGE="tak-server-db"
+
 if command -v k3s &>/dev/null || [ -f /etc/rancher/k3s/k3s.yaml ]; then
     printf $info "\nk3s detected. Loading Docker images into k3s containerd...\n"
-    docker save tak-server-db:latest | sudo k3s ctr images import -
-    docker save tak-server:latest | sudo k3s ctr images import -
+    # k3s uses containerd which needs fully-qualified image references
+    TAK_IMAGE="docker.io/library/tak-server"
+    DB_IMAGE="docker.io/library/tak-server-db"
+    docker tag tak-server-db:latest "$DB_IMAGE:latest"
+    docker tag tak-server:latest "$TAK_IMAGE:latest"
+
+    printf $info "Importing tak-server-db into k3s...\n"
+    docker save "$DB_IMAGE:latest" | sudo k3s ctr images import -
+    if [ $? -ne 0 ]; then
+        printf $danger "Failed to import tak-server-db into k3s containerd!\n"
+        exit 1
+    fi
+
+    printf $info "Importing tak-server into k3s...\n"
+    docker save "$TAK_IMAGE:latest" | sudo k3s ctr images import -
+    if [ $? -ne 0 ]; then
+        printf $danger "Failed to import tak-server into k3s containerd!\n"
+        exit 1
+    fi
+
+    # Verify both images are available
+    printf $info "\nVerifying images in k3s containerd:\n"
+    sudo k3s ctr images list | grep tak-server
+    if ! sudo k3s ctr images list | grep -q "tak-server-db"; then
+        printf $danger "tak-server-db image not found in k3s containerd! Exiting.\n"
+        exit 1
+    fi
+    if ! sudo k3s ctr images list | grep -q "tak-server:"; then
+        printf $danger "tak-server image not found in k3s containerd! Exiting.\n"
+        exit 1
+    fi
+    printf $success "Both images verified in k3s containerd.\n"
 elif command -v minikube &>/dev/null && minikube status &>/dev/null; then
     printf $info "\nLoading Docker images into minikube...\n"
     minikube image load tak-server-db:latest
@@ -373,11 +406,11 @@ printf $info "\nDeploying TAK server to Kubernetes with Helm...\n"
 # Deploy with replicas=0 first so PVCs are created but pods don't start yet
 helm upgrade --install "$RELEASE_NAME" "$HELM_CHART_DIR" \
     --namespace "$NAMESPACE" \
-    --set takserver.image=tak-server \
+    --set takserver.image="$TAK_IMAGE" \
     --set takserver.tag=latest \
     --set takserver.pullPolicy=Never \
     --set takserver.replicas=0 \
-    --set database.image=tak-server-db \
+    --set database.image="$DB_IMAGE" \
     --set database.tag=latest \
     --set database.pullPolicy=Never \
     --set database.replicas=0 \
@@ -432,11 +465,11 @@ kubectl delete pod tak-data-init -n "$NAMESPACE" --wait=true
 printf $info "\nStarting TAK server pods...\n"
 helm upgrade --install "$RELEASE_NAME" "$HELM_CHART_DIR" \
     --namespace "$NAMESPACE" \
-    --set takserver.image=tak-server \
+    --set takserver.image="$TAK_IMAGE" \
     --set takserver.tag=latest \
     --set takserver.pullPolicy=Never \
     --set takserver.replicas=1 \
-    --set database.image=tak-server-db \
+    --set database.image="$DB_IMAGE" \
     --set database.tag=latest \
     --set database.pullPolicy=Never \
     --set database.replicas=1 \
