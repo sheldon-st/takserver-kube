@@ -453,6 +453,9 @@ kubectl rollout status deployment/"${RELEASE_NAME}-tak-server-tak" -n "$NAMESPAC
 TAK_POD=$(kubectl get pods -n "$NAMESPACE" -l "app.kubernetes.io/component=takserver" -o jsonpath='{.items[0].metadata.name}')
 
 ### Generate certificates
+# Clean up any existing certs from a previous run
+kubectl exec -n "$NAMESPACE" "$TAK_POD" -- bash -c "rm -f /opt/tak/certs/files/ca.pem /opt/tak/certs/files/ca-trusted.pem /opt/tak/certs/files/ca.key /opt/tak/certs/files/root-ca.pem /opt/tak/certs/files/root-ca-trusted.pem /opt/tak/certs/files/root-ca.key" 2>/dev/null
+
 while :; do
     sleep 5
     printf $warning "------------CERTIFICATE GENERATION--------------\n"
