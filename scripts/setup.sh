@@ -451,6 +451,23 @@ kubectl rollout status deployment/"${RELEASE_NAME}-tak-server-db" -n "$NAMESPACE
 kubectl rollout status deployment/"${RELEASE_NAME}-tak-server-tak" -n "$NAMESPACE" --timeout=300s
 
 TAK_POD=$(kubectl get pods -n "$NAMESPACE" -l "app.kubernetes.io/component=takserver" -o jsonpath='{.items[0].metadata.name}')
+DB_POD=$(kubectl get pods -n "$NAMESPACE" -l "app.kubernetes.io/component=database" -o jsonpath='{.items[0].metadata.name}')
+
+### Ensure DB password matches CoreConfig.xml
+printf $info "\nWaiting for database to fully initialize...\n"
+sleep 15
+printf $info "Syncing database password with CoreConfig.xml...\n"
+DB_SYNC_RETRIES=0
+while [ $DB_SYNC_RETRIES -lt 12 ]; do
+    DB_SYNC_RETRIES=$((DB_SYNC_RETRIES + 1))
+    kubectl exec -n "$NAMESPACE" "$DB_POD" -- su - postgres -c "psql -c \"ALTER USER martiuser WITH PASSWORD '${pgpassword}';\""
+    if [ $? -eq 0 ]; then
+        printf $success "Database password synchronized.\n"
+        break
+    fi
+    printf $warning "Database not ready yet, retrying in 10s (attempt $DB_SYNC_RETRIES/12)...\n"
+    sleep 10
+done
 
 ### Generate certificates
 # Clean up any existing certs from a previous run
