@@ -24,6 +24,9 @@ docker image rm tak-server --force 2>/dev/null
 # Remove images from k3s containerd if present
 if command -v k3s &>/dev/null || [ -f /etc/rancher/k3s/k3s.yaml ]; then
     echo "Removing images from k3s containerd..."
+    # Remove both short and fully-qualified names in case either was used
+    sudo k3s ctr images rm tak-server:latest 2>/dev/null
+    sudo k3s ctr images rm tak-server-db:latest 2>/dev/null
     sudo k3s ctr images rm docker.io/library/tak-server:latest 2>/dev/null
     sudo k3s ctr images rm docker.io/library/tak-server-db:latest 2>/dev/null
 fi

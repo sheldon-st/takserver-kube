@@ -21,6 +21,19 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: takserver
     spec:
+      initContainers:
+        - name: wait-for-db
+          image: busybox:latest
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for database to accept connections..."
+              until nc -z tak-database 5432; do
+                echo "DB not ready, waiting 5s..."
+                sleep 5
+              done
+              echo "Database is accepting connections."
       containers:
         - name: takserver
           image: "{{ .Values.takserver.image }}:{{ .Values.takserver.tag }}"

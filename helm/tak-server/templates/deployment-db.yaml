@@ -25,6 +25,21 @@ spec:
         - name: tak-database
           image: "{{ .Values.database.image }}:{{ .Values.database.tag }}"
           imagePullPolicy: {{ .Values.database.pullPolicy }}
+          ports:
+            - containerPort: 5432
+              name: postgres
+          readinessProbe:
+            exec:
+              command:
+                - su
+                - "-"
+                - postgres
+                - -c
+                - pg_isready -U postgres
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
           volumeMounts:
             - name: db-data
               mountPath: /var/lib/postgresql/data

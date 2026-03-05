@@ -352,25 +352,26 @@ DB_IMAGE="tak-server-db"
 
 if command -v k3s &>/dev/null || [ -f /etc/rancher/k3s/k3s.yaml ]; then
     printf $info "\nk3s detected. Loading Docker images into k3s containerd...\n"
-    # k3s uses containerd which needs fully-qualified image references
-    TAK_IMAGE="docker.io/library/tak-server"
-    DB_IMAGE="docker.io/library/tak-server-db"
-    docker tag tak-server-db:latest "$DB_IMAGE:latest"
-    docker tag tak-server:latest "$TAK_IMAGE:latest"
+
+    # Save to temp files first to avoid sudo breaking the pipe
+    docker save tak-server-db:latest -o /tmp/tak-server-db.tar
+    docker save tak-server:latest -o /tmp/tak-server.tar
 
     printf $info "Importing tak-server-db into k3s...\n"
-    docker save "$DB_IMAGE:latest" | sudo k3s ctr images import -
+    sudo k3s ctr images import /tmp/tak-server-db.tar
     if [ $? -ne 0 ]; then
         printf $danger "Failed to import tak-server-db into k3s containerd!\n"
         exit 1
     fi
 
     printf $info "Importing tak-server into k3s...\n"
-    docker save "$TAK_IMAGE:latest" | sudo k3s ctr images import -
+    sudo k3s ctr images import /tmp/tak-server.tar
     if [ $? -ne 0 ]; then
         printf $danger "Failed to import tak-server into k3s containerd!\n"
         exit 1
     fi
+
+    rm -f /tmp/tak-server-db.tar /tmp/tak-server.tar
 
     # Verify both images are available
     printf $info "\nVerifying images in k3s containerd:\n"
@@ -478,26 +479,36 @@ helm upgrade --install "$RELEASE_NAME" "$HELM_CHART_DIR" \
     --set certs.city="$city" \
     --set certs.orgUnit="$orgunit"
 
-### Wait for TAK server to be ready
-printf $info "\nWaiting for TAK server pods to be ready...\n"
-kubectl rollout status deployment/"${RELEASE_NAME}-tak-server-db" -n "$NAMESPACE" --timeout=300s
-kubectl rollout status deployment/"${RELEASE_NAME}-tak-server-tak" -n "$NAMESPACE" --timeout=300s
+### Wait for pods to be ready (DB has a readiness probe, TAK has an init container waiting for DB)
+printf $info "\nWaiting for database to be ready (has readiness probe)...\n"
+kubectl rollout status deployment/"${RELEASE_NAME}-tak-server-db" -n "$NAMESPACE" --timeout=600s
+if [ $? -ne 0 ]; then
+    printf $danger "Database deployment failed to become ready.\n"
+    printf $info "Check DB logs: kubectl logs -f deployment/${RELEASE_NAME}-tak-server-db -n $NAMESPACE\n"
+    exit 1
+fi
+
+printf $info "Waiting for TAK server to be ready (waits for DB via init container)...\n"
+kubectl rollout status deployment/"${RELEASE_NAME}-tak-server-tak" -n "$NAMESPACE" --timeout=600s
+if [ $? -ne 0 ]; then
+    printf $danger "TAK server deployment failed to become ready.\n"
+    printf $info "Check TAK logs: kubectl logs -f deployment/${RELEASE_NAME}-tak-server-tak -n $NAMESPACE\n"
+    exit 1
+fi
 
 TAK_POD=$(kubectl get pods -n "$NAMESPACE" -l "app.kubernetes.io/component=takserver" -o jsonpath='{.items[0].metadata.name}')
 DB_POD=$(kubectl get pods -n "$NAMESPACE" -l "app.kubernetes.io/component=database" -o jsonpath='{.items[0].metadata.name}')
 
-### Wait for database to fully initialize (configureInDocker.sh creates martiuser)
-printf $info "\nWaiting for database initialization to complete...\n"
-printf $info "The DB entrypoint script needs time to initialize PostgreSQL and create the martiuser role.\n"
+### Wait for martiuser role to be created by DB entrypoint script
+printf $info "\nWaiting for database schema initialization...\n"
 DB_INIT_RETRIES=0
 DB_INIT_MAX=60
 while [ $DB_INIT_RETRIES -lt $DB_INIT_MAX ]; do
     DB_INIT_RETRIES=$((DB_INIT_RETRIES + 1))
-    # Check if martiuser role exists
     MARTIUSER_EXISTS=$(kubectl exec -n "$NAMESPACE" "$DB_POD" -- su - postgres -c "psql -AXqtc \"SELECT 1 FROM pg_roles WHERE rolname='martiuser'\"" 2>/dev/null)
     if [ "$MARTIUSER_EXISTS" = "1" ]; then
-        printf $success "\nDatabase initialized - martiuser role exists.\n"
-        # Now sync the password to guarantee it matches CoreConfig.xml
+        printf $success "Database schema ready - martiuser role exists.\n"
+        # Sync password to guarantee it matches CoreConfig.xml
         kubectl exec -n "$NAMESPACE" "$DB_POD" -- su - postgres -c "psql -c \"ALTER USER martiuser WITH PASSWORD '${pgpassword}';\""
         if [ $? -eq 0 ]; then
             printf $success "Database password synchronized.\n"
@@ -505,14 +516,13 @@ while [ $DB_INIT_RETRIES -lt $DB_INIT_MAX ]; do
         break
     fi
     if [ $((DB_INIT_RETRIES % 6)) -eq 0 ]; then
-        printf $info "Still waiting for DB init (attempt $DB_INIT_RETRIES/$DB_INIT_MAX)... checking DB logs:\n"
-        kubectl logs --tail=5 -n "$NAMESPACE" "$DB_POD" 2>/dev/null
+        printf $info "Still waiting for martiuser role (attempt $DB_INIT_RETRIES/$DB_INIT_MAX)...\n"
     fi
     sleep 5
 done
 
 if [ "$MARTIUSER_EXISTS" != "1" ]; then
-    printf $danger "\nDatabase failed to initialize after $DB_INIT_MAX attempts.\n"
+    printf $danger "\nDatabase schema failed to initialize after $DB_INIT_MAX attempts.\n"
     printf $info "Check DB logs: kubectl logs -f -n $NAMESPACE $DB_POD\n"
     exit 1
 fi
