@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tak-server.fullname" . }}-tak
+  labels:
+    {{- include "tak-server.labels" . | nindent 4 }}
+    app.kubernetes.io/component: takserver
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.ports.ssl }}
+      targetPort: ssl
+      protocol: TCP
+      name: ssl
+    - port: {{ .Values.service.ports.https }}
+      targetPort: https
+      protocol: TCP
+      name: https
+    - port: {{ .Values.service.ports.fedHttps }}
+      targetPort: fed-https
+      protocol: TCP
+      name: fed-https
+    - port: {{ .Values.service.ports.certHttps }}
+      targetPort: cert-https
+      protocol: TCP
+      name: cert-https
+    - port: {{ .Values.service.ports.webSocketSecure }}
+      targetPort: ws-secure
+      protocol: TCP
+      name: ws-secure
+    - port: {{ .Values.service.ports.webSocket }}
+      targetPort: ws
+      protocol: TCP
+      name: ws
+  selector:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: takserver

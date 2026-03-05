@@ -1,4 +1,5 @@
 .env
+.DS_Store
 *.war
 takserver-*.zip
 tak/
@@ -7,3 +8,5 @@ originalWAR/
 chatbot/
 server.pref
 manifest.xml
+share/
+*.p12

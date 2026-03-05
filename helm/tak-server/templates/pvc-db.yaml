@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "tak-server.fullname" . }}-db-data
+  labels:
+    {{- include "tak-server.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.database.storage.storageClass }}
+  storageClassName: {{ .Values.database.storage.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.database.storage.size }}

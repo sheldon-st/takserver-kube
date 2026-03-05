@@ -18,12 +18,14 @@ labels: bug
 Please provide as much information as possible about your environment:
 
 - Hardware Make/Model: XXX
-- Operating System and Version (e.g. `cat /etc/os-release`): XXX
+- Operating System and Version (e.g. `uname -a`): XXX
+- Kubernetes Version (`kubectl version`): XXX
+- Helm Version (`helm version`): XXX
 - Docker Version (`docker -v`): XXX
-- Docker Compose Version (`docker compose version`) or (`docker-compose version`): XXX
+- Cluster Type (minikube/kind/Docker Desktop/cloud): XXX
 - CPU Details (make/model and/or speed/core count): XXX
-- RAM (e.g. `free -h`): XXX
-- Disk Availability (e.g. `df -h`): XXX
+- RAM: XXX
+- Disk Availability: XXX
 - TAK Server Version From TAK.gov: XXX
 
 <!-- If you have any other specifics relating to your environment which you feel is important please include them to the list above. -->

@@ -1,18 +1,23 @@
 #!/bin/bash
 
-DOCKER_COMPOSE="docker-compose"
+NAMESPACE="tak"
+RELEASE_NAME="tak-server"
 
-if ! command -v docker-compose
-then
-        DOCKER_COMPOSE="docker compose"
-        echo "Docker compose command set to new style $DOCKER_COMPOSE"
-fi
+echo "Uninstalling TAK server Helm release..."
+helm uninstall "$RELEASE_NAME" -n "$NAMESPACE" 2>/dev/null
 
-$DOCKER_COMPOSE down
-docker volume rm --force tak-server_db_data
+echo "Deleting PVCs..."
+kubectl delete pvc --all -n "$NAMESPACE" 2>/dev/null
+
+echo "Deleting namespace..."
+kubectl delete namespace "$NAMESPACE" 2>/dev/null
+
+echo "Removing local tak directory..."
 rm -rf tak
 rm -rf /tmp/takserver
 
-# Comment me out to save yourself rebuilding........
-docker image rm tak-server-db --force
-docker image rm tak-server-tak --force
+echo "Removing Docker images (optional)..."
+docker image rm tak-server-db --force 2>/dev/null
+docker image rm tak-server --force 2>/dev/null
+
+echo "Cleanup complete."

@@ -2,7 +2,7 @@
 
 ![TAK logo](img/tak.jpg)
 
-This is a Docker wrapper for an official 'OG' TAK server from [TAK Product Center](https://tak.gov/) intended for beginners. It will give you a turnkey TAK server with SSL which works with ATAK, iTAK, WinTAK.
+This is a Kubernetes/Helm wrapper for an official 'OG' TAK server from [TAK Product Center](https://tak.gov/) intended for beginners. It will give you a turnkey TAK server with SSL which works with ATAK, iTAK, WinTAK.
 
 
 ## IMPORTANT: Download the Official TAK Release
@@ -13,7 +13,7 @@ Releases are now public at [https://tak.gov/products/tak-server](https://tak.gov
 
 Please follow account registration process, and once completed go to the link above.
 
-The integrity of the release will be checked at setup against the MD5/SHA1 checksums in this repo. **THESE MUST MATCH**. If they do not match, **DO NOT** proceed unless you trust the release. 
+The integrity of the release will be checked at setup against the MD5/SHA1 checksums in this repo. **THESE MUST MATCH**. If they do not match, **DO NOT** proceed unless you trust the release.
 
 Old releases are a security risk as they contain known vulnerabilities. For more information, read the big red notices on tak.gov
 
@@ -33,119 +33,100 @@ Old releases are a security risk as they contain known vulnerabilities. For more
 
 ## Requirements
 
-- Debian-based operating system, such as Debian or Ubuntu
-- Docker with `compose` (https://docs.docker.com/engine/install/ubuntu/ or https://docs.docker.com/engine/install/debian/)
-- A TAK server release
+- **macOS** or **Linux** (Debian, Ubuntu, etc.)
+- A Kubernetes cluster (local or remote):
+  - [Docker Desktop with Kubernetes](https://docs.docker.com/desktop/kubernetes/)
+  - [minikube](https://minikube.sigs.k8s.io/docs/start/)
+  - [kind](https://kind.sigs.k8s.io/)
+  - Any cloud-managed cluster (EKS, GKE, AKS)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- [Helm](https://helm.sh/docs/intro/install/)
+- [Docker](https://docs.docker.com/engine/install/) (for building images)
+- A TAK server release ZIP file
 - 4GB memory
 - Network connection
-- `unzip` and `netstat` utilities
-
-## Setup Video 
-
-Please use the below link to see a short video on a complete setup of TAK Server.
-
-[TAK Server install (Docker)](https://www.youtube.com/watch?v=h4PA9NN-cDk)
+- `unzip` utility
 
 ## Prerequisites
 
-Fetch the dependencies, then clone the git repository and `cd` into the directory
+Install the required tools for your platform, then clone the repo:
+
+### macOS
 
 ```bash
-sudo apt update
-sudo apt install net-tools unzip zip
+brew install kubectl helm
+# Install Docker Desktop: https://docs.docker.com/desktop/install/mac-install/
 git clone https://github.com/Cloud-RF/tak-server.git
 cd tak-server
 ```
 
-### Setup Docker's apt repository
-
-First, set up Docker's apt repository. These steps are already completed on the WarDragon. Open a terminal and run the following commands:
+### Linux (Debian/Ubuntu)
 
 ```bash
-# Add Docker's official GPG key:
-sudo apt-get update
-sudo apt-get install ca-certificates curl gnupg
-sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-sudo chmod a+r /etc/apt/keyrings/docker.gpg
-
-# Add the repository to Apt sources:
-echo \
-  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update
-
-# Install the Docker packages.
-# To install the latest version, run:
-sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo apt update
+sudo apt install unzip zip
+# Install kubectl: https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
+# Install helm: https://helm.sh/docs/intro/install/
+# Install Docker: https://docs.docker.com/engine/install/
+git clone https://github.com/Cloud-RF/tak-server.git
+cd tak-server
 ```
 
-### Docker Security
+### Setting Up a Local Kubernetes Cluster
 
-**IT IS NOT RECOMMENDED TO RUN PRIVILEGED CONTAINERS ON THE DOCKER HOST.**
-
-These scripts assume you don't need to `sudo` for `docker` and `docker-compose`. As such it is assumed that your user account is a member of the `docker` group as is indicated during the correct installation of Docker. This will allow you to run `docker` commands without `sudo`.
-
-For more information please consult [the official installation documentation provided by Docker](https://docs.docker.com/engine/install/linux-postinstall/).
-
-To test if you are able to run `docker` commands without `sudo` you can test with the following command:
+If you don't already have a Kubernetes cluster, the easiest option is Docker Desktop with Kubernetes enabled, or minikube:
 
 ```bash
-docker run hello-world
+# Option A: Docker Desktop - Enable Kubernetes in Docker Desktop Settings > Kubernetes
+
+# Option B: minikube
+brew install minikube   # macOS
+minikube start --memory 4096
 ```
 
-### AMD64 & ARM64 (Pi4) setup 
+### AMD64 & ARM64 (Apple Silicon / Pi4) Support
 
-The script will auto-detect your architecture and use the ARM Docker file if the architecture is determined to be `arm64`.
+The script auto-detects your architecture and uses the appropriate Dockerfile.
 
 ## Installation
 
-You should copy your downloaded **TAKSERVER-DOCKER-X.X-RELEASE** ZIP file to the `tak-server` directory.
-
-Assuming that your current working directory is the `tak-server` as cloned previously, you can then proceed to run the [setup.sh script](./scripts/setup.sh).
+Copy your downloaded **TAKSERVER-DOCKER-X.X-RELEASE** ZIP file to the `tak-server` directory, then run:
 
 ```bash
 chmod +x scripts/setup.sh
 ./scripts/setup.sh
 ```
 
-The `setup.sh` script will populate configuration files, start up TAK server with a PostgreSQL database via Docker compose and generate the required certificates. There will be prompts and some input required from the user such as certificate names. At the end of the setup the user will be given random passwords and a link to access the web interface where further settings can be applied.
+The `setup.sh` script will:
+1. Verify the release checksum
+2. Build Docker images for the TAK server and PostgreSQL database
+3. Deploy to Kubernetes using Helm
+4. Generate SSL certificates
+5. Create admin and user accounts
+6. Output credentials and access information
 
-For more information on using TAK server refer to [the documentation on the TAK Product Center GitHub](https://github.com/TAK-Product-Center/Server/tree/main/src/docs).
-
-### NIC selection
-The interactive network interface prompt requires you to select your interface. Ensure this is the interface on which you want clients to access the service. For a wired network it's likely en* or eth*.
-
-    Choose your TAK SERVER network interface wisely...
-    1) enp5s0
-    2) virbr0
-    3) virbr0-nic
-    4) docker0
-    5) br-b60854e61cd0
+### NIC Selection
+The interactive network interface prompt requires you to select your interface. Ensure this is the interface on which you want clients to access the service.
 
 ### Network Ports
 
-TAK server needs the following port numbers to operate. Services already using these will cause a problem which the script will detect and offer a resolution for.
+TAK server needs the following port numbers to operate:
 
-- `5432`
-- `8089`
-- `8443`
-- `8444`
-- `8446`
-- `9000`
-- `9001`
-
-If you are going to expose these ports be careful. Not all of them run secure protocols. For peace of mind, and for working through firewalls and NAT routers run this on a VPN like OpenVPN or NordVPN.
+- `8089` - SSL/TLS
+- `8443` - HTTPS (Web UI)
+- `8444` - Federation HTTPS
+- `8446` - Certificate HTTPS
+- `9000` - WebSocket Secure
+- `9001` - WebSocket
 
 ### Successful Installation
 
-If your TAK Server was able to successfully be installed then you should see in your console a similar message:
+If your TAK Server was able to successfully be installed then you should see a message similar to:
 
 ```console
 Import the admin.p12 certificate from this folder to your browser as per the README.md file
 Login at https://10.0.0.6:8443 with your admin account. No need to run the /setup step as this has been done.
-Certificates and *CERT DATA PACKAGES* are in tak/certs/files 
+Certificates and .zip data packages are in tak/certs/files
 
 Setup script sponsored by CloudRF.com - "The API for RF"
 
@@ -158,31 +139,29 @@ Postgresql password: <Your password here>
 ---------PASSWORDS----------------
 
 MAKE A NOTE OF YOUR PASSWORDS. THEY WON'T BE SHOWN AGAIN.
-Docker containers should automatically start with the docker service from now on.
+Kubernetes namespace: tak
+Helm release: tak-server
 ```
 
 ## Admin Login
 
-The login to the web interface requires the certificate created during setup. The certificate needs to be uploaded to the browser first. The name of this certificate is the one which you have typed after specifying the State, City, and Company during the certificate creation. 
+The login to the web interface requires the certificate created during setup. Default certificate name is `admin.p12`.
 
-Default certificate name is `admin.p12`. The certificates names can be checked by:
+To list certificates:
 
 ```bash
-docker exec -it tak-server-tak-1 ls -hal /opt/tak/certs/files 
+kubectl exec -it -n tak deployment/tak-server-tak-server-tak -- ls -hal /opt/tak/certs/files
 ```
 
 ### Installing Your Admin Certificate
 
-The `admin.p12` certificate needs to be copied from `./tak/certs/files/` and installed in a web browser for you to be able to administer your TAK Server. This not only provides TLS transport security with mutual authentication (Client > Server, Server > Client) but it proves your identity and saves you having to type a tedious password each time.
-
+The `admin.p12` certificate needs to be copied from `./tak/certs/files/` and installed in a web browser.
 
 #### Google Chrome
 
 * Go to **"Settings"** --> **"Privacy and Security"** --> **"Security"** --> **"Manage Certificates"**
-* Navigate to **"Your certificates"** 
+* Navigate to **"Your certificates"**
 * Press **"Import"** button and choose your `.p12` file (Default password is `atakatak`)
-
-The web UI should be now accessible via the address given below.
 
 #### Mozilla Firefox
 
@@ -194,47 +173,41 @@ The web UI should be now accessible via the address given below.
 * Click your certificate name and press button **"Edit Trust"**
 * __*TICK*__ the box with **"This certificate can identify web sites"** statement, then click **"OK"**
 
-The web UI should be now accessible via the address given below.
-
 ## Web UI Access
 
 The web user interface can be only accessed via **SSL** on port **8443**.
 
-The login prompt will not show up as the server authenticates the user based on the uploaded certificate.
-
-The user interface is available at the below address and on all other NICs. Check your firewall as you may not want this exposed on a public NIC.
-
 `https://localhost:8443`
 
-### Re-Starting Server After Shutdown
-
-Make sure you are in the main `tak-server` directory and append the `-d` flag to run the process in the background.
+If using NodePort, the port may differ. Check with:
 
 ```bash
-cd tak-server
-docker compose up -d
+kubectl get svc -n tak
 ```
 
-### Shutting Down Running TAK Server
-
-Make sure you are in the main `tak-server` directory.
+Or use port-forwarding:
 
 ```bash
-cd tak-server
-docker compose down
+kubectl port-forward svc/tak-server-tak-server-tak 8443:8443 -n tak
 ```
 
-### Logging
-
-You can access a shell in the running Docker container with this command:
+### Checking Pod Status
 
 ```bash
-docker exec -it tak-server-tak-1 tail -f /opt/tak/logs/takserver.log
+kubectl get pods -n tak
 ```
 
-To tail the server log from **OUTSITE** the container as the `tak` folder is mapped:
+### Viewing Logs
 
-tail -f ./tak/logs/takserver.log
+```bash
+kubectl logs -f deployment/tak-server-tak-server-tak -n tak
+```
+
+### Accessing a Shell in the TAK Pod
+
+```bash
+kubectl exec -it -n tak deployment/tak-server-tak-server-tak -- bash
+```
 
 ### Clean Up
 
@@ -242,21 +215,19 @@ tail -f ./tak/logs/takserver.log
 sudo ./scripts/cleanup.sh
 ```
 
-This script will stop the TAK Server container, remove the mapped database volume and remove the folder `tak` which is created in the project root directory (cloned from GitHub) during the setup process. 
+This script will uninstall the Helm release, delete PVCs, remove the namespace, and clean up local files.
 
-**WARNING** - If you have data in an existing TAK database container it will be lost.
+**WARNING** - If you have data in an existing TAK database it will be lost.
 
 ## Adding Your First EUD / ATAK Device
 
-If you've never setup ATAK with a server before you need server and user certificates. You can load these manually as `.p12` files or the easier way is with a `.zip` data package and a manifest.
+You can find ready made data packages in the `tak/certs/files` directory. Copy these to your device's SD card then import the `.zip` into ATAK / iTAK with the "Import" function and choose "Local SD".
 
-You can find ready made data packages in the `tak/certs/files` directory. You need to copy these to your device's SD card then import the `.zip` into ATAK / iTAK with the "Import" function and choose "Local SD".
-
-This will add a server, certificates and a user account. You will still need to create this user with the matching name for example, `user1`, in your TAK server user management dashboard and assign them to a common group.
+This will add a server, certificates and a user account. You will still need to create this user with the matching name in your TAK server user management dashboard and assign them to a common group.
 
 ## Federated TAK server
 
-If you would like to federate TAK servers you will need to exchange ca.pem files between servers to the fed-truststore.jks file located within tak/certs/files
+If you would like to federate TAK servers you will need to exchange ca.pem files between servers to the fed-truststore.jks file:
 
 ```bash
 keytool -importcert -file ca.pem -keystore tak-server/tak/certs/files/fed-truststore.jks -alias "tak"
@@ -264,18 +235,19 @@ keytool -importcert -file ca.pem -keystore tak-server/tak/certs/files/fed-trusts
 
 ### Transferring user certificates via HTTP
 
-You can run a script to serve the `.zip` files on TCP port `12345`, for example, http://0.0.0.0:12345. This launches a mini Python web server and serves the content of the `share` folder which will contain your certificates. Only do this on a trusted network as it is not encrypted.
+You can run a script to serve the `.zip` files on TCP port `12345`. Only do this on a trusted network as it is not encrypted.
 
 **Sharing certificates via insecure protocols is not recommended best practice. For a secure method, copy it to the SD card with a USB cable**
 
-```console
+```bash
 ./scripts/shareCerts.sh
-Serving HTTP on 0.0.0.0 port 12345 (http://0.0.0.0:12345/) ...
-10.0.0.5 - - [23/Nov/2022 15:49:52] "GET / HTTP/1.1" 200 -
-10.0.0.5 - - [23/Nov/2022 15:49:54] "GET /user1-10.0.0.3.dp.zip HTTP/1.1" 200 
 ```
 
-Stop the script with `Ctrl-C` once transferred to close the server.
+Stop the script with `Ctrl-C` once transferred.
+
+# Production Deployment
+
+For deploying to a VPS with a reverse proxy, subdomain, firewall, and backups, see the [Production Deployment Guide](PRODUCTION.md).
 
 # FAQ
 
@@ -289,7 +261,7 @@ https://www.freecodecamp.org/news/how-to-make-your-first-pull-request-on-github-
 
 ## Authors and Acknowledgment
 
-Thanks to the TAK product center for open-sourcing and maintaining all things TAK. 
+Thanks to the TAK product center for open-sourcing and maintaining all things TAK.
 
 Thanks to James Wu 'wubar' on GitLab/Discord for publishing the Docker wrapper on which this was built.
 

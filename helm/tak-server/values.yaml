@@ -1,0 +1,60 @@
+## TAK Server Helm chart values
+
+## TAK Server image settings
+## The setup script builds and pushes these images to a local or remote registry
+takserver:
+  image: tak-server
+  tag: latest
+  pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1"
+    limits:
+      memory: "4Gi"
+      cpu: "2"
+
+## PostgreSQL/PostGIS database image settings
+database:
+  image: tak-server-db
+  tag: latest
+  pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1"
+  storage:
+    size: 10Gi
+    storageClass: ""
+
+## TAK data persistent volume (certs, config, logs)
+takData:
+  storage:
+    size: 5Gi
+    storageClass: ""
+
+## Service configuration
+service:
+  type: NodePort
+  ports:
+    ssl: 8089
+    https: 8443
+    fedHttps: 8444
+    certHttps: 8446
+    webSocketSecure: 9000
+    webSocket: 9001
+
+## Memory allocation for TAK server JVM (in kB)
+jvmMemoryKb: "4000000"
+
+## Certificate defaults
+certs:
+  country: "US"
+  state: "state"
+  city: "city"
+  orgUnit: "TAK"
