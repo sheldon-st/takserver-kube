@@ -487,12 +487,21 @@ kubectl cp "$NAMESPACE/$TAK_POD:/opt/tak/certs/files/" "$PROJECT_DIR/tak/certs/f
 # Copy data packages back into the PVC
 kubectl cp "$PROJECT_DIR/tak/certs/files/" "$NAMESPACE/$TAK_POD:/opt/tak/certs/files/"
 
-printf $info "Waiting for TAK server to connect to DB...\n"
-sleep 5
+printf $info "Waiting for TAK server services to initialize (this can take 1-2 minutes)...\n"
+sleep 30
 
 ### Set up admin user and database
+RETRY_COUNT=0
+MAX_RETRIES=30
 while :; do
-    sleep 5
+    sleep 10
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    if [ $RETRY_COUNT -gt $MAX_RETRIES ]; then
+        printf $danger "\nFailed after $MAX_RETRIES attempts. Check TAK server logs:\n"
+        printf $info "  kubectl logs -f deployment/${RELEASE_NAME}-tak-server-tak -n $NAMESPACE\n"
+        printf $info "  kubectl logs -f deployment/${RELEASE_NAME}-tak-server-db -n $NAMESPACE\n"
+        exit 1
+    fi
     kubectl exec -n "$NAMESPACE" "$TAK_POD" -- bash -c "cd /opt/tak/ && java -jar /opt/tak/utils/UserManager.jar usermod -A -p '$password' $user"
     if [ $? -eq 0 ]; then
         kubectl exec -n "$NAMESPACE" "$TAK_POD" -- bash -c "cd /opt/tak/ && java -jar utils/UserManager.jar certmod -A certs/files/$user.pem"
@@ -501,13 +510,13 @@ while :; do
             if [ $? -eq 0 ]; then
                 break
             else
-                sleep 5
+                sleep 10
             fi
         else
-            sleep 5
+            sleep 10
         fi
     else
-        printf $info "No joy with DB at $IP, will retry in 5s. If this loops more than 10 times give up.\n"
+        printf $info "TAK server not ready yet (attempt $RETRY_COUNT/$MAX_RETRIES), retrying in 10s...\n"
     fi
 done
 
