@@ -1,3 +1,4 @@
 FROM postgres:15.11
 RUN apt-get update && apt install -y postgresql-15-postgis-3 openjdk-17-jdk
+RUN touch /.dockerenv
 ENTRYPOINT ["/bin/bash", "-c", "/opt/tak/db-utils/configureInDocker.sh"]
