@@ -346,9 +346,9 @@ printf $info "\nBuilding Docker images for $DOCKER_ARCH...\n"
 docker build -t tak-server-db:latest -f "$PROJECT_DIR/docker/$DOCKER_ARCH/Dockerfile.takserver-db" "$PROJECT_DIR"
 docker build -t tak-server:latest -f "$PROJECT_DIR/docker/$DOCKER_ARCH/Dockerfile.takserver" "$PROJECT_DIR"
 
-### Load images into Kubernetes cluster (minikube/kind)
-if command -v k3s &>/dev/null && sudo k3s kubectl get nodes &>/dev/null 2>&1; then
-    printf $info "\nLoading Docker images into k3s...\n"
+### Load images into Kubernetes cluster
+if command -v k3s &>/dev/null || [ -f /etc/rancher/k3s/k3s.yaml ]; then
+    printf $info "\nk3s detected. Loading Docker images into k3s containerd...\n"
     docker save tak-server-db:latest | sudo k3s ctr images import -
     docker save tak-server:latest | sudo k3s ctr images import -
 elif command -v minikube &>/dev/null && minikube status &>/dev/null; then
