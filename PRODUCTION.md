@@ -148,12 +148,20 @@ If `with-stream` is not shown, install the full version:
 sudo apt install -y nginx-extras
 ```
 
-### Nginx Configuration
+### Nginx Configuration (SNI-Based Subdomain Routing)
+
+TAK ports use TLS, so Nginx can read the **SNI (Server Name Indication)** field from the TLS ClientHello to determine which hostname the client is connecting to. This lets you:
+
+- Only accept connections to `tak.yourdomain.com`
+- Reject connections via the raw IP address or any other subdomain
+- Run other services on the same VPS without conflicts
+
+**Replace `tak.yourdomain.com` with your actual subdomain throughout.**
 
 Create `/etc/nginx/nginx.conf`:
 
 ```nginx
-# Main context - keep existing worker settings
+# Main context
 user www-data;
 worker_processes auto;
 pid /run/nginx.pid;
@@ -163,64 +171,106 @@ events {
     worker_connections 1024;
 }
 
-# TCP passthrough for TAK mTLS ports
+# TCP passthrough for TAK mTLS ports with SNI-based subdomain filtering
 stream {
-    # Logging (optional)
     log_format stream_log '$remote_addr [$time_local] '
                           '$protocol $status $bytes_sent $bytes_received '
-                          '$session_time "$upstream_addr"';
+                          '$session_time "$upstream_addr" '
+                          'SNI="$ssl_preread_server_name"';
 
     access_log /var/log/nginx/stream_access.log stream_log;
 
-    # TAK Web UI / API (mTLS)
+    # ---- Upstream backends (kubectl port-forward targets) ----
+    upstream tak_https    { server 127.0.0.1:18443; }
+    upstream tak_ssl      { server 127.0.0.1:18089; }
+    upstream tak_fed      { server 127.0.0.1:18444; }
+    upstream tak_certenrl { server 127.0.0.1:18446; }
+
+    # ---- SNI routing maps ----
+    # Each map reads the SNI hostname and routes to the correct upstream.
+    # Any hostname that does NOT match returns "" which causes Nginx to
+    # close the connection immediately.
+
+    map $ssl_preread_server_name $tak_https_backend {
+        tak.yourdomain.com    tak_https;
+        default               "";
+    }
+
+    map $ssl_preread_server_name $tak_ssl_backend {
+        tak.yourdomain.com    tak_ssl;
+        default               "";
+    }
+
+    map $ssl_preread_server_name $tak_fed_backend {
+        tak.yourdomain.com    tak_fed;
+        default               "";
+    }
+
+    map $ssl_preread_server_name $tak_certenrl_backend {
+        tak.yourdomain.com    tak_certenrl;
+        default               "";
+    }
+
+    # ---- Port 8443: Web UI / API (mTLS) ----
     server {
         listen 8443;
         listen [::]:8443;
-        proxy_pass 127.0.0.1:18443;
+        ssl_preread on;
+        proxy_pass $tak_https_backend;
         proxy_timeout 600s;
         proxy_connect_timeout 10s;
     }
 
-    # TAK Client Connections - ATAK/iTAK/WinTAK (mTLS)
+    # ---- Port 8089: ATAK/iTAK/WinTAK client connections (mTLS) ----
     server {
         listen 8089;
         listen [::]:8089;
-        proxy_pass 127.0.0.1:18089;
+        ssl_preread on;
+        proxy_pass $tak_ssl_backend;
         proxy_timeout 600s;
         proxy_connect_timeout 10s;
     }
 
-    # Federation (mTLS)
+    # ---- Port 8444: Federation (mTLS) ----
     server {
         listen 8444;
         listen [::]:8444;
-        proxy_pass 127.0.0.1:18444;
+        ssl_preread on;
+        proxy_pass $tak_fed_backend;
         proxy_timeout 600s;
         proxy_connect_timeout 10s;
     }
 
-    # Certificate Enrollment
+    # ---- Port 8446: Certificate Enrollment ----
     server {
         listen 8446;
         listen [::]:8446;
-        proxy_pass 127.0.0.1:18446;
+        ssl_preread on;
+        proxy_pass $tak_certenrl_backend;
         proxy_timeout 600s;
         proxy_connect_timeout 10s;
     }
 }
 
-# HTTP block for optional status page or redirects
+# HTTP block
 http {
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
 
-    # Optional: health check / info page
+    # Reject requests to other subdomains / raw IP
+    server {
+        listen 80 default_server;
+        server_name _;
+        return 444;  # close connection with no response
+    }
+
+    # Your TAK subdomain - redirect HTTP to the HTTPS web UI
     server {
         listen 80;
-        server_name _;
+        server_name tak.yourdomain.com;
 
         location / {
-            return 301 https://$host:8443$request_uri;
+            return 301 https://tak.yourdomain.com:8443$request_uri;
         }
 
         location /health {
@@ -229,6 +279,32 @@ http {
         }
     }
 }
+```
+
+### How SNI Filtering Works
+
+When a TLS client connects, it sends the hostname it wants in the SNI field **before encryption starts**. Nginx reads this with `ssl_preread on` and:
+
+1. If SNI = `tak.yourdomain.com` -> proxies to the TAK backend
+2. If SNI = anything else (other subdomain, raw IP, empty) -> the `map` returns `""` which makes `proxy_pass` fail, and Nginx **drops the connection**
+
+This means:
+- `https://tak.yourdomain.com:8443` -- works
+- `https://123.45.67.89:8443` -- **dropped** (no SNI match)
+- `https://other.yourdomain.com:8443` -- **dropped** (no SNI match)
+- ATAK connecting to `tak.yourdomain.com:8089` -- works
+- ATAK connecting to `123.45.67.89:8089` -- **dropped**
+
+### Adding Multiple Subdomains
+
+If you want to run multiple TAK servers or allow an alias, add entries to the maps:
+
+```nginx
+    map $ssl_preread_server_name $tak_https_backend {
+        tak.yourdomain.com       tak_https;
+        tak-backup.yourdomain.com tak_https;
+        default                   "";
+    }
 ```
 
 ### Port Forwarding from Kubernetes
@@ -271,7 +347,13 @@ helm upgrade tak-server ./helm/tak-server \
     --reuse-values
 ```
 
-With `LoadBalancer` on k3s, the ports bind directly to the host IP and you can skip the Nginx stream proxy entirely. However, using Nginx gives you logging, rate limiting, and the ability to add an HTTP landing page.
+With `LoadBalancer` on k3s, the ports bind directly to the host IP and you can skip the Nginx stream proxy entirely. However, using Nginx gives you:
+- **SNI subdomain filtering** -- only `tak.yourdomain.com` is accepted, raw IP is rejected
+- Request logging
+- The ability to add an HTTP landing page
+- Rate limiting capabilities
+
+If you use `LoadBalancer` without Nginx, the ports are accessible via any hostname or raw IP.
 
 ### Test and Reload Nginx
 
@@ -385,12 +467,17 @@ Internet
     v
 [ VPS Firewall (UFW) ]
     |
-    +---> :8443 --> [ Nginx stream proxy ] --> :18443 --> [ k8s Service ] --> [ TAK Pod :8443 ]
-    +---> :8089 --> [ Nginx stream proxy ] --> :18089 --> [ k8s Service ] --> [ TAK Pod :8089 ]
-    +---> :8444 --> [ Nginx stream proxy ] --> :18444 --> [ k8s Service ] --> [ TAK Pod :8444 ]
-    +---> :8446 --> [ Nginx stream proxy ] --> :18446 --> [ k8s Service ] --> [ TAK Pod :8446 ]
+    +---> :8443 --> [ Nginx: SNI check ] -- tak.yourdomain.com --> :18443 --> [ k8s ] --> [ TAK Pod ]
+    |                                    \-- other/IP -----------> DROPPED
     |
-    +---> :80   --> [ Nginx HTTP ] --> redirect to :8443
+    +---> :8089 --> [ Nginx: SNI check ] -- tak.yourdomain.com --> :18089 --> [ k8s ] --> [ TAK Pod ]
+    |                                    \-- other/IP -----------> DROPPED
+    |
+    +---> :8444 --> [ Nginx: SNI check ] -- tak.yourdomain.com --> :18444 --> [ k8s ] --> [ TAK Pod ]
+    +---> :8446 --> [ Nginx: SNI check ] -- tak.yourdomain.com --> :18446 --> [ k8s ] --> [ TAK Pod ]
+    |
+    +---> :80   --> [ Nginx HTTP ] -- tak.yourdomain.com --> redirect to :8443
+                                   \-- other -----------> 444 (dropped)
 
 Inside Kubernetes (k3s):
     [ TAK Server Pod ] <----> [ PostgreSQL/PostGIS Pod ]
@@ -398,7 +485,7 @@ Inside Kubernetes (k3s):
     [ PVC: tak-data ]          [ PVC: db-data ]
 ```
 
-With `LoadBalancer` service type on k3s (simpler, no Nginx needed):
+With `LoadBalancer` service type on k3s (simpler, no Nginx, no SNI filtering):
 
 ```
 Internet
@@ -409,7 +496,7 @@ Internet
     v
 [ VPS Firewall (UFW) ]
     |
-    +---> :8443 --> [ k3s ServiceLB ] --> [ TAK Pod :8443 ]
+    +---> :8443 --> [ k3s ServiceLB ] --> [ TAK Pod :8443 ]  (accessible via ANY hostname/IP)
     +---> :8089 --> [ k3s ServiceLB ] --> [ TAK Pod :8089 ]
     +---> :8444 --> [ k3s ServiceLB ] --> [ TAK Pod :8444 ]
     +---> :8446 --> [ k3s ServiceLB ] --> [ TAK Pod :8446 ]

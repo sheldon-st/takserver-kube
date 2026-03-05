@@ -347,7 +347,11 @@ docker build -t tak-server-db:latest -f "$PROJECT_DIR/docker/$DOCKER_ARCH/Docker
 docker build -t tak-server:latest -f "$PROJECT_DIR/docker/$DOCKER_ARCH/Dockerfile.takserver" "$PROJECT_DIR"
 
 ### Load images into Kubernetes cluster (minikube/kind)
-if command -v minikube &>/dev/null && minikube status &>/dev/null; then
+if command -v k3s &>/dev/null && sudo k3s kubectl get nodes &>/dev/null 2>&1; then
+    printf $info "\nLoading Docker images into k3s...\n"
+    docker save tak-server-db:latest | sudo k3s ctr images import -
+    docker save tak-server:latest | sudo k3s ctr images import -
+elif command -v minikube &>/dev/null && minikube status &>/dev/null; then
     printf $info "\nLoading Docker images into minikube...\n"
     minikube image load tak-server-db:latest
     minikube image load tak-server:latest
@@ -356,7 +360,7 @@ elif command -v kind &>/dev/null && kind get clusters &>/dev/null 2>&1; then
     kind load docker-image tak-server-db:latest
     kind load docker-image tak-server:latest
 else
-    printf $warning "\nNo minikube or kind detected. If using Docker Desktop Kubernetes, images should be available automatically.\n"
+    printf $warning "\nNo k3s, minikube, or kind detected. If using Docker Desktop Kubernetes, images should be available automatically.\n"
     printf $warning "If images fail to pull, you may need to push them to a registry or load them manually.\n"
 fi
 
