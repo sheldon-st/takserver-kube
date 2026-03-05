@@ -453,21 +453,36 @@ kubectl rollout status deployment/"${RELEASE_NAME}-tak-server-tak" -n "$NAMESPAC
 TAK_POD=$(kubectl get pods -n "$NAMESPACE" -l "app.kubernetes.io/component=takserver" -o jsonpath='{.items[0].metadata.name}')
 DB_POD=$(kubectl get pods -n "$NAMESPACE" -l "app.kubernetes.io/component=database" -o jsonpath='{.items[0].metadata.name}')
 
-### Ensure DB password matches CoreConfig.xml
-printf $info "\nWaiting for database to fully initialize...\n"
-sleep 15
-printf $info "Syncing database password with CoreConfig.xml...\n"
-DB_SYNC_RETRIES=0
-while [ $DB_SYNC_RETRIES -lt 12 ]; do
-    DB_SYNC_RETRIES=$((DB_SYNC_RETRIES + 1))
-    kubectl exec -n "$NAMESPACE" "$DB_POD" -- su - postgres -c "psql -c \"ALTER USER martiuser WITH PASSWORD '${pgpassword}';\""
-    if [ $? -eq 0 ]; then
-        printf $success "Database password synchronized.\n"
+### Wait for database to fully initialize (configureInDocker.sh creates martiuser)
+printf $info "\nWaiting for database initialization to complete...\n"
+printf $info "The DB entrypoint script needs time to initialize PostgreSQL and create the martiuser role.\n"
+DB_INIT_RETRIES=0
+DB_INIT_MAX=60
+while [ $DB_INIT_RETRIES -lt $DB_INIT_MAX ]; do
+    DB_INIT_RETRIES=$((DB_INIT_RETRIES + 1))
+    # Check if martiuser role exists
+    MARTIUSER_EXISTS=$(kubectl exec -n "$NAMESPACE" "$DB_POD" -- su - postgres -c "psql -AXqtc \"SELECT 1 FROM pg_roles WHERE rolname='martiuser'\"" 2>/dev/null)
+    if [ "$MARTIUSER_EXISTS" = "1" ]; then
+        printf $success "\nDatabase initialized - martiuser role exists.\n"
+        # Now sync the password to guarantee it matches CoreConfig.xml
+        kubectl exec -n "$NAMESPACE" "$DB_POD" -- su - postgres -c "psql -c \"ALTER USER martiuser WITH PASSWORD '${pgpassword}';\""
+        if [ $? -eq 0 ]; then
+            printf $success "Database password synchronized.\n"
+        fi
         break
     fi
-    printf $warning "Database not ready yet, retrying in 10s (attempt $DB_SYNC_RETRIES/12)...\n"
-    sleep 10
+    if [ $((DB_INIT_RETRIES % 6)) -eq 0 ]; then
+        printf $info "Still waiting for DB init (attempt $DB_INIT_RETRIES/$DB_INIT_MAX)... checking DB logs:\n"
+        kubectl logs --tail=5 -n "$NAMESPACE" "$DB_POD" 2>/dev/null
+    fi
+    sleep 5
 done
+
+if [ "$MARTIUSER_EXISTS" != "1" ]; then
+    printf $danger "\nDatabase failed to initialize after $DB_INIT_MAX attempts.\n"
+    printf $info "Check DB logs: kubectl logs -f -n $NAMESPACE $DB_POD\n"
+    exit 1
+fi
 
 ### Generate certificates
 # Clean up any existing certs from a previous run
