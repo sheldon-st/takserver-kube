@@ -1,17 +1,34 @@
 #!/bin/bash
-# Makes an ATAK / iTAK friendly data package containing CA, user cert, user key
-if [ $# -eq 0 ]; then
-    echo "No arguments supplied. Need an IP and a user eg. ./certDP.sh 192.168.0.2 user1"
-    exit
+set -euo pipefail
+
+# Creates an ATAK / iTAK data package containing CA, user cert, and user key.
+# Usage: ./scripts/certDP.sh <IP> <username>
+
+if [ $# -lt 2 ]; then
+    echo "Usage: $0 <IP> <username>"
+    echo "  e.g. $0 192.168.0.2 user1"
+    exit 1
 fi
 
-IP=$1
-USER=$2
-
+IP="$1"
+USER="$2"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-# server.pref
-cat > server.pref <<PREF
+# Validate required cert files exist
+if [ ! -f "$PROJECT_DIR/tak/certs/files/$IP.p12" ]; then
+    echo "ERROR: Server cert not found: tak/certs/files/$IP.p12"
+    exit 1
+fi
+if [ ! -f "$PROJECT_DIR/tak/certs/files/$USER.p12" ]; then
+    echo "ERROR: User cert not found: tak/certs/files/$USER.p12"
+    exit 1
+fi
+
+# Use a temp directory for intermediate files
+TMPDIR=$(mktemp -d)
+trap "rm -rf $TMPDIR" EXIT
+
+cat > "$TMPDIR/server.pref" <<PREF
 <?xml version='1.0' encoding='ASCII' standalone='yes'?>
 <preferences>
   <preference version="1" name="cot_streams">
@@ -30,11 +47,10 @@ cat > server.pref <<PREF
 </preferences>
 PREF
 
-# manifest.xml
-cat > manifest.xml <<MANIFEST
+cat > "$TMPDIR/manifest.xml" <<MANIFEST
 <MissionPackageManifest version="2">
   <Configuration>
-    <Parameter name="uid" value="sponsored-by-cloudrf-the-api-for-rf"/>
+    <Parameter name="uid" value="tak-server-data-package"/>
     <Parameter name="name" value="$USER DP"/>
     <Parameter name="onReceiveDelete" value="true"/>
   </Configuration>
@@ -46,7 +62,10 @@ cat > manifest.xml <<MANIFEST
 </MissionPackageManifest>
 MANIFEST
 
-zip -j "$PROJECT_DIR/tak/certs/files/$USER-$IP.dp.zip" manifest.xml server.pref "$PROJECT_DIR/tak/certs/files/$IP.p12" "$PROJECT_DIR/tak/certs/files/$USER.p12"
-rm -f server.pref manifest.xml
-echo "-------------------------------------------------------------"
-echo "Created certificate data package for $USER @ $IP as tak/certs/files/$USER-$IP.dp.zip"
+zip -j "$PROJECT_DIR/tak/certs/files/$USER-$IP.dp.zip" \
+    "$TMPDIR/manifest.xml" \
+    "$TMPDIR/server.pref" \
+    "$PROJECT_DIR/tak/certs/files/$IP.p12" \
+    "$PROJECT_DIR/tak/certs/files/$USER.p12"
+
+echo "Created data package: tak/certs/files/$USER-$IP.dp.zip"

@@ -1,4 +1,4 @@
-# CloudRF TAK Server Wrapper Changelog
+# TAK Server Wrapper Changelog
 
 ## Upcoming
 

@@ -10,3 +10,5 @@ server.pref
 manifest.xml
 share/
 *.p12
+CONTEXT.md
+infra/
