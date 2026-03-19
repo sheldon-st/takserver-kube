@@ -430,12 +430,14 @@ if command -v k3s &>/dev/null || [ -f /etc/rancher/k3s/k3s.yaml ]; then
     rm -f /tmp/tak-server-db.tar /tmp/tak-server.tar
 
     printf $info "  Verifying images in k3s containerd...\n"
-    sudo k3s ctr images list | grep tak-server
-    if ! sudo k3s ctr images list | grep -q "tak-server-db"; then
+    local ctr_images
+    ctr_images=$(sudo k3s ctr images list)
+    echo "$ctr_images" | grep tak-server
+    if ! echo "$ctr_images" | grep -q "tak-server-db"; then
         printf $danger "  ERROR: tak-server-db image not found in k3s containerd.\n"
         exit 1
     fi
-    if ! sudo k3s ctr images list | grep -q "tak-server:"; then
+    if ! echo "$ctr_images" | grep -q "tak-server:"; then
         printf $danger "  ERROR: tak-server image not found in k3s containerd.\n"
         exit 1
     fi
