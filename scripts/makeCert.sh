@@ -1,33 +1,58 @@
 #!/bin/bash
 set -euo pipefail
 
-# Creates a client certificate, registers the user in TAK server, and builds
-# an ATAK/iTAK data package.
+# Creates server or client certificates for TAK server.
 #
-# Usage: ./scripts/makeCert.sh <username> <server_address> [--admin]
-#   --admin: grant admin privileges (required for web UI access on port 8443)
+# Usage:
+#   ./scripts/makeCert.sh server <server_address>
+#   ./scripts/makeCert.sh client <username> <server_address> [--admin]
+#     --admin: grant admin privileges (required for web UI access on port 8443)
+
+usage() {
+    echo "Usage:"
+    echo "  $0 server <server_address>"
+    echo "  $0 client <username> <server_address> [--admin]"
+    echo ""
+    echo "Commands:"
+    echo "  server  Generate a server certificate"
+    echo "    e.g. $0 server 192.168.1.100"
+    echo "    e.g. $0 server takserver.example.com"
+    echo ""
+    echo "  client  Generate a client certificate, register the user, and build a data package"
+    echo "    e.g. $0 client user3 192.168.1.100"
+    echo "    e.g. $0 client webadmin 192.168.1.100 --admin"
+    echo ""
+    echo "Options (client only):"
+    echo "  --admin   Grant admin privileges (needed to log into the web UI)"
+    exit 1
+}
 
 if [ $# -lt 2 ]; then
-    echo "Usage: $0 <username> <server_address> [--admin]"
-    echo ""
-    echo "  e.g. $0 user3 192.168.1.100         # ATAK/iTAK client user"
-    echo "  e.g. $0 user3 takserver.example.com  # ATAK/iTAK client user (domain)"
-    echo "  e.g. $0 webadmin 192.168.1.100 --admin  # web UI admin user"
-    echo ""
-    echo "Options:"
-    echo "  --admin   Grant admin privileges (needed to log into the web UI)"
-    echo ""
-    echo "The server address should match an existing server certificate."
-    echo "If no server cert exists yet, generate one first inside the pod:"
-    echo "  kubectl exec -n tak <pod> -- bash -c 'cd /opt/tak/certs && ./makeCert.sh server <address>'"
-    exit 1
+    usage
 fi
 
-USER="$1"
-SERVER="$2"
-ADMIN=false
-if [ "${3:-}" = "--admin" ]; then
-    ADMIN=true
+COMMAND="$1"
+shift
+
+case "$COMMAND" in
+    server|client) ;;
+    *) echo "ERROR: Unknown command '$COMMAND'"; echo ""; usage ;;
+esac
+
+if [ "$COMMAND" = "server" ]; then
+    SERVER="$1"
+elif [ "$COMMAND" = "client" ]; then
+    if [ $# -lt 2 ]; then
+        echo "ERROR: client command requires <username> and <server_address>"
+        echo ""
+        usage
+    fi
+    USER="$1"
+    SERVER="$2"
+    ADMIN=false
+    if [ "${3:-}" = "--admin" ]; then
+        ADMIN=true
+    fi
 fi
 
 NAMESPACE="tak"
@@ -42,6 +67,32 @@ if [ -z "$TAK_POD" ]; then
     exit 1
 fi
 echo "Found takserver pod: $TAK_POD"
+
+# ─── Server certificate ──────────────────────────────────────────────────────
+
+if [ "$COMMAND" = "server" ]; then
+    echo "Generating server certificate for $SERVER..."
+    kubectl exec -n "$NAMESPACE" "$TAK_POD" -- bash -c "cd /opt/tak/certs && ./makeCert.sh server $SERVER"
+    kubectl exec -n "$NAMESPACE" "$TAK_POD" -- bash -c "chown -R 1000:1000 /opt/tak/certs/"
+
+    # Copy certs locally
+    mkdir -p "$PROJECT_DIR/tak/certs/files"
+    kubectl cp "$NAMESPACE/$TAK_POD:/opt/tak/certs/files/" "$PROJECT_DIR/tak/certs/files/"
+
+    if [ ! -f "$PROJECT_DIR/tak/certs/files/$SERVER.p12" ]; then
+        echo "ERROR: Server cert $SERVER.p12 was not created."
+        exit 1
+    fi
+
+    echo ""
+    echo "-------------------------------------------------------------"
+    echo "Created server cert:  tak/certs/files/$SERVER.p12"
+    echo "-------------------------------------------------------------"
+    echo ""
+    echo "You may need to restart TAK server for the new cert to take effect:"
+    echo "  kubectl rollout restart deployment/takserver -n $NAMESPACE"
+    exit 0
+fi
 
 # ─── Generate client certificate ─────────────────────────────────────────────
 
@@ -91,7 +142,7 @@ if [ ! -f "$PROJECT_DIR/tak/certs/files/$SERVER.p12" ]; then
     echo "ERROR: Server cert $SERVER.p12 not found."
     echo "  The server certificate for '$SERVER' does not exist."
     echo "  Generate one first:"
-    echo "    kubectl exec -n $NAMESPACE $TAK_POD -- bash -c 'cd /opt/tak/certs && ./makeCert.sh server $SERVER'"
+    echo "    $0 server $SERVER"
     exit 1
 fi
 
