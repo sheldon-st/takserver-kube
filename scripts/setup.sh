@@ -430,7 +430,6 @@ if command -v k3s &>/dev/null || [ -f /etc/rancher/k3s/k3s.yaml ]; then
     rm -f /tmp/tak-server-db.tar /tmp/tak-server.tar
 
     printf $info "  Verifying images in k3s containerd...\n"
-    local ctr_images
     ctr_images=$(sudo k3s ctr images list)
     echo "$ctr_images" | grep tak-server
     if ! echo "$ctr_images" | grep -q "tak-server-db"; then
