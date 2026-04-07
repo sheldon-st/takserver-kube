@@ -23,6 +23,7 @@ fi
 echo "Found takserver pod: $POD"
 
 # Copy certs from the pod
+rm -rf "$PROJECT_DIR/share"
 mkdir -p "$PROJECT_DIR/share"
 echo "Copying certs from pod..."
 if ! kubectl cp "$NAMESPACE/$POD:/opt/tak/certs/files/" "$PROJECT_DIR/share/"; then
