@@ -1,40 +1,46 @@
-# TAK Server Wrapper Changelog
+# Changelog
 
-## Upcoming
+All notable changes to this project are documented here.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-- Check for active ports during setup no longer false flagging ephemeral ports.
-- Changelog converted to markdown.
-- Improvements to README.
+## [Unreleased]
 
-## 24/11/2022 - 4.7 REL 20
+### Added
 
-- Added 7zip support.
-- Added warnings to prevent 
-- Increased Postgres connection limits to 400 for slower boxes which loop the setup and accumulate stale Postgres connections.
-- Improved setup messages.
-- Automatic CA generation. CA is `LOL` and CN is `takserver`.
-- No more "Do you want to kill this process as sudo etc". If a port is used - the script stops.
-- Tested against TAK Server 4.7 REL 20 on AMD64 architecture.
+- GitHub issue forms, PR template, CI (Helm lint/template, ShellCheck, checksum list sync), and Dependabot.
+- `SECURITY.md`, `CONTRIBUTING.md`, `.editorconfig`.
+- Helm chart metadata (`home`, `sources`, `keywords`, `maintainers`, `icon`, `kubeVersion`) and standard
+  `helm.sh/chart` / `app.kubernetes.io/version` labels.
 
-## 23/11/2022 - 4.7 REL 20
+### Changed
 
-- Edited Posgres configuration to reduce memory requirement.
-- Removed hardcoded Postgres memory options in startup scripts.
-- Added mini web server to deploy setup data packages.
-- Updated `CoreConfig.xml` IP addresses to enable rate limiter and federation server.
-- Fixed startup race condition which caused HTTPS `8443` to fail to HTTP `8080`.
+- README and FAQ updated for this repository (clone URL, k3s support, paths, removed dead links).
 
-## 18/10/2022 - 4.7 REL 20
+## [1.0.0] - 2026-04-07
 
-- Automatic generation of user certificates.
-- Automatic generation of certificate data packages for users.
-- Streamlined setup with removal of a bogus Docker start/stop.
-- Fixed issue with random passwords failing to meet complexity requirement.
-- Tested against ATAK 4.7 and iTAK 2.3.
+Kubernetes / Helm rewrite of the Docker Compose wrapper.
 
-## 17/08/2022 - 4.7 REL 18
+### Added
 
-- Automatic SSL setup
-- Removes insecure protocols
-- Fixes broken Docker database authentication in upstream release.
-- Enforces HTTPS only.
+- Helm chart (`helm/tak-server`) deploying TAK Server and PostGIS with persistent volumes.
+- `scripts/setup.sh`: checksum verification, image build, image loading for k3s / minikube / kind,
+  Helm deploy, certificate and account bootstrap.
+- `scripts/makeCert.sh` (client and `--admin` certs + data packages), `scripts/shareCerts.sh`,
+  `scripts/cleanup.sh`.
+- AMD64 and ARM64 Dockerfiles.
+
+### Changed
+
+- Removed Docker Compose workflow in favor of Kubernetes.
+
+## Upstream history
+
+This project began from the Docker Compose wrapper by
+[Cloud-RF/tak-server](https://github.com/Cloud-RF/tak-server). Notable upstream milestones:
+
+- **2025-10-06** — Checksums for 5.4 REL 106 and 5.5 REL 58; NIC selection.
+- **2025-07-13** — 5.4 REL 19 support; license changed from GPL-3.0 to MIT.
+- **2022-11-24** — 7zip support, automatic CA generation, Postgres connection limit raised to 400.
+- **2022-11-23** — Reduced Postgres memory, mini web server for data packages, fixed HTTPS startup race.
+- **2022-10-18** — Automatic user certificates and data packages.
+- **2022-08-17** — Automatic SSL setup, HTTPS only, insecure protocols removed.

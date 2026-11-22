@@ -1,21 +1,27 @@
-# FREQUENTLY ASKED QUESTIONS
+# Frequently Asked Questions
 
 ## Where are the docs?
 
-You can find the PDF manual in the tak/docs folder and get help from *community volunteers* via the TAK Discord server. If you ask a bone FAQ already covered in the manual, or demand urgent assistance, expect to get some grief. **RTFM and be patient**.
+The official PDF manual ships inside the TAK Server release ZIP (`docs/` folder) and is also available on [tak.gov](https://tak.gov/products/tak-server). Community volunteers help on the TAK Discord server; please check the manual first and be patient.
 
 ## How do I start over?
-```
-sudo ./scripts/cleanup.sh
+```bash
+./scripts/cleanup.sh
 ```
 
-This script will uninstall the Helm release, delete PVCs, remove the Kubernetes namespace, and clean up local files.
+This script will uninstall the Helm release, delete PVCs, remove the Kubernetes namespace, and clean up local files. On k3s it will prompt for `sudo` to remove images from containerd.
 
 WARNING: If you have data in an existing TAK database it will be lost.
 
 ## How do I make a new certificate for my EUDs?
 
-You can generate certificates using kubectl exec:
+The easiest way is the helper script, which also builds a data package:
+
+```bash
+./scripts/makeCert.sh EUD1 <server-ip>
+```
+
+Or manually via kubectl exec:
 
 ```bash
 kubectl exec -it -n tak deployment/tak-server-tak-server-tak -- bash -c "cd /opt/tak/certs && ./makeCert.sh client EUD1"
@@ -91,7 +97,7 @@ A successful POST will return a JSON message containing a SHA256 hash. This hash
 
 ## Why was the license changed
 
-The GPL3.0 license was replaced with the more permissive MIT license in July 2025 since we learnt lawyers were making an unreasonable amount of amendments to Tak Server's GPL3.0 section 7 (Additional Terms) to further complicate the already complex licensing situtation.
+The GPL3.0 license was replaced with the more permissive MIT license in July 2025 since we learnt lawyers were making an unreasonable amount of amendments to Tak Server's GPL3.0 section 7 (Additional Terms) to further complicate the already complex licensing situation.
 
 We replaced the complex GPL3.0 license with a simple one which doesn't obligate users to do anything (or require input from a lawyer).
 

@@ -1,14 +1,26 @@
-.env
+# OS / editor
 .DS_Store
-*.war
+.env
+
+# TAK release archives and extracted artifacts
 takserver-*.zip
+*.war
 tak/
-investigation/
 originalWAR/
-chatbot/
+
+# Generated certificates and keys (never commit these)
+*.p12
+*.pem
+*.jks
+*.key
+
+# Generated device config / data packages
 server.pref
 manifest.xml
 share/
-*.p12
-CONTEXT.md
+
+# Local scratch
+investigation/
+chatbot/
 infra/
+CONTEXT.md

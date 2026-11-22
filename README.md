@@ -1,8 +1,26 @@
-# TAK SERVER
+# TAK Server on Kubernetes
+
+[![CI](https://github.com/sheldon-st/takserver-kube/actions/workflows/ci.yml/badge.svg)](https://github.com/sheldon-st/takserver-kube/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Helm](https://img.shields.io/badge/helm-v3-0F1689?logo=helm)
+![TAK Server](https://img.shields.io/badge/TAK%20Server-5.x-2E7D32)
+![Arch](https://img.shields.io/badge/arch-amd64%20%7C%20arm64-lightgrey)
 
 ![TAK logo](img/tak.jpg)
 
-A Kubernetes/Helm wrapper for the official TAK server from [TAK Product Center](https://tak.gov/). Provides a turnkey TAK server with SSL that works with ATAK, iTAK, and WinTAK.
+A Kubernetes / Helm wrapper for the official TAK Server from the [TAK Product Center](https://tak.gov/). Provides a turnkey TAK Server with SSL and PostGIS that works with ATAK, iTAK, and WinTAK, on k3s, minikube, kind, Docker Desktop, or a managed cluster.
+
+## Contents
+
+- [Download the Official TAK Release](#download-the-official-tak-release)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Admin Login](#admin-login)
+- [Web UI Access](#web-ui-access)
+- [Common Commands](#common-commands)
+- [Adding Your First EUD / ATAK Device](#adding-your-first-eud--atak-device)
+- [Repository Layout](#repository-layout)
+- [FAQ](#faq)
 
 ## Download the Official TAK Release
 
@@ -28,10 +46,13 @@ Old releases contain known vulnerabilities. For more information, see the notice
 | `takserver-docker-5.4-RELEASE-106.zip` | `522MB` | `edce00ff13f8fdfb340e7e05eafc5454` | `7f7da1a58544b34e01576b99f8db59e1987cd96c` |
 | `takserver-docker-5.5-RELEASE-58.zip`  | `531MB` | `6d362f234305b9a5e8f9245ef8f3e45d` | `7f0c07aa0ad7ff575c0278d734264e3e446ec93c` |
 
+The full list used by `setup.sh` (including 5.0 and 5.1) is in [`tak-md5checksum.txt`](tak-md5checksum.txt) and [`tak-sha1checksum.txt`](tak-sha1checksum.txt).
+
 ## Requirements
 
 - **macOS** or **Linux** (Debian, Ubuntu, etc.)
 - A Kubernetes cluster (local or remote):
+  - [k3s](https://k3s.io/) (images are imported into containerd automatically)
   - [Docker Desktop with Kubernetes](https://docs.docker.com/desktop/kubernetes/)
   - [minikube](https://minikube.sigs.k8s.io/docs/start/)
   - [kind](https://kind.sigs.k8s.io/)
@@ -53,8 +74,8 @@ Install the required tools for your platform, then clone the repo:
 ```bash
 brew install kubectl helm
 # Install Docker Desktop: https://docs.docker.com/desktop/install/mac-install/
-git clone <your-repo-url>
-cd tak-server
+git clone https://github.com/sheldon-st/takserver-kube.git
+cd takserver-kube
 ```
 
 ### Linux (Debian/Ubuntu)
@@ -65,8 +86,8 @@ sudo apt install unzip zip
 # Install kubectl: https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
 # Install helm: https://helm.sh/docs/intro/install/
 # Install Docker: https://docs.docker.com/engine/install/
-git clone <your-repo-url>
-cd tak-server
+git clone https://github.com/sheldon-st/takserver-kube.git
+cd takserver-kube
 ```
 
 ### Setting Up a Local Kubernetes Cluster
@@ -87,7 +108,7 @@ The setup script auto-detects your architecture and uses the appropriate Dockerf
 
 ## Installation
 
-Copy your downloaded **TAKSERVER-DOCKER-X.X-RELEASE** ZIP file to the `tak-server` directory, then run:
+Copy your downloaded **TAKSERVER-DOCKER-X.X-RELEASE** ZIP file to the repository root, then run:
 
 ```bash
 chmod +x scripts/setup.sh
@@ -231,7 +252,7 @@ The `--admin` flag is required for users who need to access the web UI. Without 
 To federate TAK servers, exchange `ca.pem` files between servers and add them to `fed-truststore.jks`:
 
 ```bash
-keytool -importcert -file ca.pem -keystore tak-server/tak/certs/files/fed-truststore.jks -alias "tak"
+keytool -importcert -file ca.pem -keystore tak/certs/files/fed-truststore.jks -alias "tak"
 ```
 
 ### Transferring User Certificates via HTTP
@@ -244,9 +265,16 @@ You can temporarily serve `.zip` data packages on TCP port 12345 for device setu
 
 Stop with `Ctrl-C` once transferred. For secure transfer, copy to the device via USB.
 
-## Production Deployment
+## Repository Layout
 
-For deploying to a VPS with a reverse proxy, subdomain, firewall, and backups, see the [Production Deployment Guide](infra/PRODUCTION.md).
+| Path | Purpose |
+| --- | --- |
+| `helm/tak-server/` | Helm chart (TAK Server + PostGIS deployments, services, PVCs) |
+| `docker/{amd64,arm64}/` | Dockerfiles for the TAK Server and database images |
+| `scripts/` | `setup.sh`, `makeCert.sh`, `certDP.sh`, `shareCerts.sh`, `cleanup.sh` |
+| `CoreConfig.xml` | TAK Server configuration applied during setup |
+| `tak-*checksum.txt` | Known-good release checksums verified by `setup.sh` |
+| `tak/` | Generated at runtime (certs, data packages); git-ignored |
 
 ## FAQ
 
@@ -254,13 +282,13 @@ See [Frequently Asked Questions](FAQ.md).
 
 ## Contributing
 
-Pull requests welcome. See the [beginner's guide to GitHub PRs](https://www.freecodecamp.org/news/how-to-make-your-first-pull-request-on-github-3/).
+Pull requests welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). For security issues, see [SECURITY.md](SECURITY.md).
 
 ## Authors and Acknowledgment
 
 Thanks to the TAK Product Center for open-sourcing and maintaining all things TAK.
 
-Thanks to James Wu 'wubar' on GitLab/Discord for publishing the Docker wrapper on which this was built.
+This project is a Kubernetes adaptation of the Docker Compose wrapper by [Cloud-RF/tak-server](https://github.com/Cloud-RF/tak-server), which in turn built on the Docker wrapper published by James Wu 'wubar' on GitLab/Discord.
 
 ## Useful Links
 
