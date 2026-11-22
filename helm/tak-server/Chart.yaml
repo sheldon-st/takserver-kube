@@ -1,6 +1,25 @@
 apiVersion: v2
 name: tak-server
-description: TAK Server Helm chart for Kubernetes
+description: Deploy the official TAK Server (ATAK / iTAK / WinTAK) with PostGIS on Kubernetes.
 type: application
 version: 1.0.0
 appVersion: "5.6"
+kubeVersion: ">=1.25.0-0"
+home: https://github.com/sheldon-st/takserver-kube
+sources:
+  - https://github.com/sheldon-st/takserver-kube
+  - https://tak.gov/products/tak-server
+keywords:
+  - tak
+  - takserver
+  - atak
+  - itak
+  - wintak
+  - cot
+  - postgis
+maintainers:
+  - name: sheldon-st
+    url: https://github.com/sheldon-st
+icon: https://raw.githubusercontent.com/sheldon-st/takserver-kube/main/img/tak.png
+annotations:
+  artifacthub.io/license: MIT

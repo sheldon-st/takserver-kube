@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  helm:
+    name: Helm lint & template
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint helm/tak-server --strict
+      - run: helm template tak-server helm/tak-server --namespace tak > /dev/null
+
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ShellCheck
+        run: shellcheck --severity=warning scripts/*.sh
+
+  checksums:
+    name: Checksum lists in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: MD5 and SHA1 lists cover the same releases
+        run: |
+          diff <(awk '{print $2}' tak-md5checksum.txt | sort) \
+               <(awk '{print $2}' tak-sha1checksum.txt | sort)

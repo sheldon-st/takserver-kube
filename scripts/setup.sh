@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2154  # color vars (info/success/warning/danger) are assigned dynamically by color()
 set -euo pipefail
 
 # ─── Colors ───────────────────────────────────────────────────────────────────

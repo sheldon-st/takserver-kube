@@ -1,0 +1,83 @@
+name: Bug report
+description: Report something that's broken.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please include as much detail as possible so others can reproduce it.
+        **Do not paste passwords, private keys, or `.p12` files.**
+
+  - type: input
+    id: tak-version
+    attributes:
+      label: TAK Server release
+      description: Exact release ZIP filename from tak.gov.
+      placeholder: takserver-docker-5.5-RELEASE-58.zip
+    validations:
+      required: true
+
+  - type: dropdown
+    id: cluster
+    attributes:
+      label: Cluster type
+      options:
+        - k3s
+        - minikube
+        - kind
+        - Docker Desktop
+        - Managed cloud (EKS / GKE / AKS)
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: arch
+    attributes:
+      label: Architecture
+      options:
+        - amd64
+        - arm64
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Output of the commands below, plus hardware (CPU / RAM / disk) if relevant.
+      value: |
+        - OS (`uname -a`):
+        - Kubernetes (`kubectl version`):
+        - Helm (`helm version`):
+        - Docker (`docker -v`):
+        - Hardware:
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, and what did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `./scripts/setup.sh`
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / debug output
+      description: |
+        Useful commands: `kubectl get pods -n tak`, `kubectl describe pod -n tak <pod>`,
+        `kubectl logs -n tak deployment/tak-server-tak-server-tak`.
+      render: shell

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: TAK Server downloads & official docs
+    url: https://tak.gov/products/tak-server
+    about: Download releases and read the official TAK Server documentation.
+  - name: Security vulnerability
+    url: https://github.com/sheldon-st/takserver-kube/security/advisories/new
+    about: Report security issues privately, not as a public issue.

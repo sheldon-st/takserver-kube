@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directories:
+      - /docker/amd64
+      - /docker/arm64
+    schedule:
+      interval: monthly
+    ignore:
+      # Postgres major and Java major are pinned to what TAK Server supports.
+      - dependency-name: postgres
+        update-types: ["version-update:semver-major"]
+      - dependency-name: eclipse-temurin
+        update-types: ["version-update:semver-major"]

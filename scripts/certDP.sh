@@ -26,7 +26,7 @@ fi
 
 # Use a temp directory for intermediate files
 TMPDIR=$(mktemp -d)
-trap "rm -rf $TMPDIR" EXIT
+trap 'rm -rf "$TMPDIR"' EXIT
 
 cat > "$TMPDIR/server.pref" <<PREF
 <?xml version='1.0' encoding='ASCII' standalone='yes'?>
