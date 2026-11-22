@@ -151,7 +151,7 @@ fi
 echo "Building data package for $USER @ $SERVER..."
 
 TMPDIR=$(mktemp -d)
-trap "rm -rf $TMPDIR" EXIT
+trap 'rm -rf "$TMPDIR"' EXIT
 
 cat > "$TMPDIR/server.pref" <<PREF
 <?xml version='1.0' encoding='ASCII' standalone='yes'?>
