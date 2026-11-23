@@ -17,8 +17,8 @@ jobs:
     name: Helm lint & template
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v5
       - run: helm lint helm/tak-server --strict
       - run: helm template tak-server helm/tak-server --namespace tak > /dev/null
 
@@ -26,7 +26,7 @@ jobs:
     name: ShellCheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run ShellCheck
         run: shellcheck --severity=warning scripts/*.sh
 
@@ -34,7 +34,7 @@ jobs:
     name: Checksum lists in sync
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: MD5 and SHA1 lists cover the same releases
         run: |
           diff <(awk '{print $2}' tak-md5checksum.txt | sort) \
